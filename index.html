@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eximar</title>
+  <meta name="description" content="Eximar">
+  <meta property="og:title" content="Eximar">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#060708">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='14' y='14' width='36' height='36' rx='6' fill='none' stroke='%23d99e6a' stroke-width='3'/%3E%3Cpath d='M25 25 L39 39 M39 25 L25 39' stroke='%23e9edf1' stroke-width='3' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #060708;
+      --ink: #e9edf1;
+      --ink-dim: #6d7681;
+      --accent: #d99e6a;
+      --hairline: rgba(233, 237, 241, 0.14);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #field {
+      position: fixed;
+      inset: 0;
+      display: block;
+    }
+
+    /* Radial darkening toward the edges so the center composition stays dominant */
+    .vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 120% 90% at 50% 42%, transparent 30%, rgba(6, 7, 8, 0.82) 100%);
+    }
+
+    main {
+      position: relative;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2.4rem;
+      text-align: center;
+      padding: 0 1.5rem;
+    }
+
+    .mark {
+      width: clamp(52px, 8vw, 72px);
+      height: auto;
+      opacity: 0;
+      animation: rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+    }
+
+    .wordmark {
+      font-size: clamp(2rem, 7vw, 4rem);
+      font-weight: 500;
+      letter-spacing: 0.38em;
+      /* Letter-spacing trails the last glyph; shift right by half to re-center */
+      margin-right: -0.38em;
+      text-transform: uppercase;
+      opacity: 0;
+      animation: rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards;
+    }
+
+    .rule {
+      width: clamp(120px, 18vw, 200px);
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--hairline) 25%, var(--hairline) 75%, transparent);
+      opacity: 0;
+      animation: rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.45s forwards;
+    }
+
+    footer {
+      position: fixed;
+      bottom: 2rem;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 0.7rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      opacity: 0;
+      animation: rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.6s forwards;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .mark, .wordmark, .rule, footer {
+        animation: none;
+        opacity: 1;
+        transform: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="field" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <main>
+    <svg class="mark" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Eximar mark">
+      <rect x="17" y="17" width="38" height="38" rx="7" stroke="var(--accent)" stroke-width="2.5"/>
+      <path d="M28 28 L44 44 M44 28 L28 44" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- Package pins, three per side -->
+      <g stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" opacity="0.55">
+        <path d="M27 17 V9 M36 17 V9 M45 17 V9"/>
+        <path d="M27 55 V63 M36 55 V63 M45 55 V63"/>
+        <path d="M17 27 H9 M17 36 H9 M17 45 H9"/>
+        <path d="M55 27 H63 M55 36 H63 M55 45 H63"/>
+      </g>
+    </svg>
+
+    <h1 class="wordmark">Eximar</h1>
+
+    <div class="rule" aria-hidden="true"></div>
+  </main>
+
+  <footer>&copy; 2026 Eximar</footer>
+
+  <script>
+    (function () {
+      var canvas = document.getElementById("field");
+      var ctx = canvas.getContext("2d");
+      var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      var GAP = 46;            // grid pitch in CSS pixels
+      var MAX_PULSES = 7;
+      var TRAIL = 70;          // trail length in samples
+      var dpr, width, height;
+      var pulses = [];
+
+      function resize() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        if (reducedMotion) drawGrid();
+      }
+
+      function drawGrid() {
+        ctx.fillStyle = "rgba(233, 237, 241, 0.05)";
+        for (var x = GAP; x < width; x += GAP) {
+          for (var y = GAP; y < height; y += GAP) {
+            ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
+          }
+        }
+      }
+
+      var DIRS = [ [1, 0], [-1, 0], [0, 1], [0, -1] ];
+
+      function spawnPulse() {
+        var cols = Math.floor(width / GAP);
+        var rows = Math.floor(height / GAP);
+        var x = (1 + Math.floor(Math.random() * Math.max(cols - 1, 1))) * GAP;
+        var y = (1 + Math.floor(Math.random() * Math.max(rows - 1, 1))) * GAP;
+        return {
+          x: x,
+          y: y,
+          dir: DIRS[Math.floor(Math.random() * 4)],
+          speed: 1.1 + Math.random() * 0.9,
+          distToNode: GAP,
+          trail: [],
+          life: 600 + Math.random() * 600,
+          warm: Math.random() < 0.4  // portion of pulses use the accent color
+        };
+      }
+
+      function stepPulse(p) {
+        var step = p.speed;
+        while (step > 0) {
+          var advance = Math.min(step, p.distToNode);
+          p.x += p.dir[0] * advance;
+          p.y += p.dir[1] * advance;
+          p.distToNode -= advance;
+          step -= advance;
+          if (p.distToNode <= 0) {
+            p.distToNode = GAP;
+            if (Math.random() < 0.5) {
+              // Turn 90 degrees, never reverse
+              var horizontal = p.dir[0] !== 0;
+              p.dir = horizontal
+                ? (Math.random() < 0.5 ? [0, 1] : [0, -1])
+                : (Math.random() < 0.5 ? [1, 0] : [-1, 0]);
+            }
+          }
+        }
+        p.trail.push([p.x, p.y]);
+        if (p.trail.length > TRAIL) p.trail.shift();
+        p.life -= 1;
+      }
+
+      function drawPulse(p) {
+        var n = p.trail.length;
+        if (n < 2) return;
+        var fade = Math.min(p.life / 80, 1);  // fade out at end of life
+        var base = p.warm ? "217, 158, 106" : "233, 237, 241";
+        var maxAlpha = (p.warm ? 0.5 : 0.28) * fade;
+        for (var i = 1; i < n; i++) {
+          ctx.strokeStyle = "rgba(" + base + "," + (maxAlpha * (i / n)).toFixed(3) + ")";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(p.trail[i - 1][0], p.trail[i - 1][1]);
+          ctx.lineTo(p.trail[i][0], p.trail[i][1]);
+          ctx.stroke();
+        }
+        ctx.fillStyle = "rgba(" + base + "," + (0.9 * fade).toFixed(3) + ")";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function offscreen(p) {
+        return p.x < -GAP || p.x > width + GAP || p.y < -GAP || p.y > height + GAP;
+      }
+
+      var spawnTimer = 0;
+
+      function frame() {
+        ctx.clearRect(0, 0, width, height);
+        drawGrid();
+
+        spawnTimer -= 1;
+        if (pulses.length < MAX_PULSES && spawnTimer <= 0) {
+          pulses.push(spawnPulse());
+          spawnTimer = 40 + Math.random() * 50;
+        }
+
+        for (var i = pulses.length - 1; i >= 0; i--) {
+          var p = pulses[i];
+          stepPulse(p);
+          drawPulse(p);
+          if (p.life <= 0 || offscreen(p)) pulses.splice(i, 1);
+        }
+
+        requestAnimationFrame(frame);
+      }
+
+      window.addEventListener("resize", resize);
+      resize();
+      if (!reducedMotion) requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
